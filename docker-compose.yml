@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      TZ_NAME: ${TZ_NAME:-Europe/Moscow}
+      ADMIN_USER: ${ADMIN_USER:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_ALLOWED_USER_IDS: ${TELEGRAM_ALLOWED_USER_IDS:-}
+      TELEGRAM_ALLOW_ALL: ${TELEGRAM_ALLOW_ALL:-}
+    volumes:
+      - payments-data:/data
+    restart: unless-stopped
+
+volumes:
+  payments-data:

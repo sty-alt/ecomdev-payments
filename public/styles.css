@@ -1,0 +1,952 @@
+/*
+ * «Классный журнал»: клетчатая бумага, красная линия полей, долги — красной ручкой,
+ * действия — синими чернилами. Отметки об оплате по месяцам выглядят как клетки журнала.
+ */
+
+@font-face {
+  font-family: "Golos Text";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url("/fonts/golos-text-cyrillic-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Golos Text";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 900;
+  src: url("/fonts/golos-text-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+20BD, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+:root {
+  --paper: #f6f8fc;
+  --paper-raised: #ffffff;
+  --paper-sunk: #edf1f8;
+  --grid: rgb(43 75 199 / 0.07);
+  --ink: #1d2742;
+  --ink-muted: #5b6582;
+  --pen: #2b4bc7;
+  --pen-strong: #1f3aa3;
+  --pen-wash: rgb(43 75 199 / 0.08);
+  --margin: #c8382f;
+  --margin-wash: rgb(200 56 47 / 0.08);
+  --paid: #2a7350;
+  --paid-wash: rgb(42 115 80 / 0.1);
+  --line: #d9deea;
+  --field: #ffffff;
+  --focus: rgb(43 75 199 / 0.35);
+  --shadow: 0 18px 50px rgb(29 39 66 / 0.18);
+  --cell: 24px;
+  --radius: 12px;
+  --radius-small: 8px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #131a2b;
+    --paper-raised: #1a2338;
+    --paper-sunk: #10172a;
+    --grid: rgb(140 165 255 / 0.06);
+    --ink: #e7ebf5;
+    --ink-muted: #9ca6c0;
+    --pen: #8ea5ff;
+    --pen-strong: #b0c0ff;
+    --pen-wash: rgb(142 165 255 / 0.1);
+    --margin: #ff7d73;
+    --margin-wash: rgb(255 125 115 / 0.1);
+    --paid: #6fd19b;
+    --paid-wash: rgb(111 209 155 / 0.1);
+    --line: #2c3752;
+    --field: #0f1524;
+    --focus: rgb(142 165 255 / 0.4);
+    --shadow: 0 18px 50px rgb(0 0 0 / 0.5);
+    color-scheme: dark;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-padding-top: 16px;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink);
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: var(--cell) var(--cell);
+  font-variant-numeric: tabular-nums;
+}
+
+p,
+h1,
+h2,
+h3,
+ul,
+ol {
+  margin: 0;
+}
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+a {
+  color: var(--pen);
+}
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+button {
+  cursor: pointer;
+}
+[hidden] {
+  display: none !important;
+}
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------- Лист с полями ---------- */
+
+.sheet {
+  position: relative;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 16px 16px 112px 32px;
+}
+.sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 18px;
+  width: 2px;
+  background: var(--margin);
+  opacity: 0.5;
+}
+
+.masthead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.masthead h1 {
+  font-size: 1.625rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.month {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.month__label {
+  min-width: 7.6em;
+  text-align: center;
+  font-weight: 600;
+}
+.month__label small {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--ink-muted);
+  line-height: 1;
+}
+.round-button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-raised);
+  color: var(--pen);
+  font-size: 1.375rem;
+  line-height: 1;
+}
+.round-button:hover {
+  border-color: var(--pen);
+}
+.round-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- Вкладки ---------- */
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 16px;
+  border-radius: 999px;
+  background: var(--paper-sunk);
+  border: 1px solid var(--line);
+  width: fit-content;
+}
+.tab {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+.tab[aria-selected="true"] {
+  background: var(--paper-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 3px rgb(29 39 66 / 0.12);
+}
+.tab__count {
+  margin-left: 6px;
+  font-weight: 500;
+  color: var(--margin);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+}
+
+/* ---------- Сводка месяца ---------- */
+
+.summary {
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+.summary__collected {
+  font-size: 1.0625rem;
+}
+.summary__collected strong {
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.summary__bar {
+  display: block;
+  width: 100%;
+  height: 10px;
+  margin: 10px 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--margin-wash);
+  overflow: hidden;
+  appearance: none;
+}
+.summary__bar::-webkit-progress-bar {
+  background: var(--margin-wash);
+}
+.summary__bar::-webkit-progress-value {
+  border-radius: 5px;
+  background: var(--paid);
+  transition: width 0.4s ease;
+}
+.summary__bar::-moz-progress-bar {
+  border-radius: 5px;
+  background: var(--paid);
+}
+.summary__details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+}
+.summary__details b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.summary__details .debt b {
+  color: var(--margin);
+}
+
+/* ---------- Фильтр групп ---------- */
+
+.filter-set {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.filter {
+  flex: none;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-raised);
+  color: var(--ink);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+.filter[aria-pressed="true"] {
+  border-color: var(--pen);
+  background: var(--pen);
+  color: var(--paper-raised);
+}
+.filter span {
+  opacity: 0.7;
+  margin-left: 4px;
+}
+
+/* ---------- Строки списков ---------- */
+
+.rows {
+  border-top: 1px solid var(--line);
+}
+.row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.row__main {
+  min-width: 0;
+  flex: 1;
+}
+.row__name {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.row__name:hover {
+  color: var(--pen);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+.row__meta a {
+  text-decoration: none;
+  white-space: nowrap;
+}
+.row__meta a:hover {
+  text-decoration: underline;
+}
+.row__side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: right;
+}
+
+.debtor__bar {
+  height: 4px;
+  margin: 8px 0 4px;
+  max-width: 220px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.debtor__bar span {
+  display: block;
+  height: 100%;
+  background: var(--paid);
+}
+.debtor__paid {
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+.debtor__debt {
+  color: var(--margin);
+  font-weight: 700;
+  font-size: 1.125rem;
+  white-space: nowrap;
+}
+
+.pill-button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--pen);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--pen);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+.pill-button:hover {
+  background: var(--pen);
+  color: var(--paper-raised);
+}
+
+.status {
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.status--paid {
+  color: var(--paid);
+}
+.status--debt {
+  color: var(--margin);
+}
+.status--future {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.group-title {
+  padding: 18px 0 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ink-muted);
+  border-bottom: 1px solid var(--line);
+}
+.group-title:first-child {
+  padding-top: 0;
+}
+
+.row--flash {
+  animation: flash 1.4s ease-out;
+}
+@keyframes flash {
+  from {
+    background: var(--paid-wash);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.empty {
+  padding: 24px 0;
+  color: var(--ink-muted);
+  max-width: 46ch;
+}
+.empty strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.empty--good strong {
+  color: var(--paid);
+}
+
+.loading {
+  padding: 24px 0;
+  color: var(--ink-muted);
+}
+
+/* ---------- Ученики: панель поиска ---------- */
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.search {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--field);
+  font-size: 1rem;
+}
+.search:focus {
+  border-color: var(--pen);
+  outline: 3px solid var(--focus);
+  outline-offset: 0;
+}
+.toolbar__note {
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+
+/* ---------- Форма оплаты ---------- */
+
+.pay {
+  align-self: start;
+  padding: 20px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-raised);
+}
+.pay h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+.field label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.field input,
+.field select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--field);
+  font-size: 1rem; /* 16px — iOS не увеличивает страницу при фокусе */
+}
+.field input:focus,
+.field select:focus {
+  border-color: var(--pen);
+  outline: 3px solid var(--focus);
+  outline-offset: 0;
+}
+.field [aria-invalid="true"] {
+  border-color: var(--margin);
+}
+.field__hint {
+  margin-top: 6px;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+.field__error {
+  margin-top: 6px;
+  font-size: 0.875rem;
+  color: var(--margin);
+}
+.field__hint:empty,
+.field__error:empty {
+  display: none;
+}
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.amount {
+  display: flex;
+  gap: 8px;
+}
+.amount input {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+.chip {
+  flex: none;
+  padding: 0 12px;
+  border: 1px dashed var(--margin);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--margin);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.chip:hover {
+  border-style: solid;
+  background: var(--margin-wash);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--pen);
+  color: #fff;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+.button:hover {
+  background: var(--pen-strong);
+}
+.button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+.button--quiet {
+  background: transparent;
+  color: var(--pen);
+  border: 1px solid var(--pen);
+}
+.button--quiet:hover {
+  background: var(--pen-wash);
+}
+.button--danger {
+  background: transparent;
+  color: var(--margin);
+  border: 1px solid var(--margin);
+}
+.button--danger:hover {
+  background: var(--margin-wash);
+}
+.button--danger[data-armed] {
+  background: var(--margin);
+  color: #fff;
+}
+.button--small {
+  width: auto;
+  min-height: 44px;
+  font-size: 0.9375rem;
+}
+
+/* ---------- Нижняя панель на телефоне ---------- */
+
+.dock {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 10;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--paper) 30%);
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+.dock[data-hidden] {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+.dock .button {
+  box-shadow: var(--shadow);
+}
+
+/* ---------- Уведомление с отменой ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(calc(100% - 32px), 460px);
+  padding: 12px 12px 12px 16px;
+  border-radius: var(--radius);
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: var(--shadow);
+  transform: translateX(-50%);
+  animation: toast-in 0.2s ease-out;
+}
+.toast p {
+  flex: 1;
+  font-size: 0.9375rem;
+}
+.toast button {
+  flex: none;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--paper);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.toast--error {
+  background: var(--margin);
+  color: #fff;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+/* ---------- Карточка ученика ---------- */
+
+.sheet-dialog {
+  width: 100%;
+  max-width: 560px;
+  max-height: min(92vh, 900px);
+  margin: auto auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 18px 18px 0 0;
+  background: var(--paper-raised);
+  color: var(--ink);
+  box-shadow: var(--shadow);
+}
+.sheet-dialog::backdrop {
+  background: rgb(19 26 43 / 0.45);
+}
+.sheet-dialog[open] {
+  animation: sheet-in 0.22s ease-out;
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.dialog__head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 16px 12px;
+  background: var(--paper-raised);
+  border-bottom: 1px solid var(--line);
+}
+.dialog__head h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.dialog__head p {
+  font-size: 0.9375rem;
+  color: var(--ink-muted);
+}
+.dialog__phone {
+  font-size: 0.9375rem;
+  text-decoration: none;
+}
+.dialog__phone:hover {
+  text-decoration: underline;
+}
+.dialog__body {
+  padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+}
+.dialog__section + .dialog__section {
+  margin-top: 24px;
+}
+.dialog__section h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dialog__actions .button {
+  flex: 1 1 160px;
+}
+
+/* Журнальная строка: месяц и отметка об оплате, как в классном журнале. */
+.journal {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-small);
+  overflow: hidden;
+}
+.journal__cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 2px 10px;
+  border-left: 1px solid var(--line);
+  text-align: center;
+}
+.journal__cell:first-child {
+  border-left: 0;
+}
+.journal__month {
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+.journal__mark {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+.journal__cell--full .journal__mark {
+  color: var(--paid);
+}
+.journal__cell--debt {
+  background: var(--margin-wash);
+}
+.journal__cell--debt .journal__mark {
+  color: var(--margin);
+  font-size: 0.75rem;
+  letter-spacing: -0.02em;
+}
+.journal__cell--none .journal__mark {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+.journal__cell--current {
+  box-shadow: inset 0 -3px 0 var(--pen);
+}
+.journal__legend {
+  margin-top: 8px;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+}
+
+.history li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+.history li:first-child {
+  border-top: 1px solid var(--line);
+}
+.history__amount {
+  font-weight: 600;
+}
+.history__date {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+}
+.link-button {
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.link-button:hover {
+  color: var(--margin);
+}
+.link-button[data-armed] {
+  color: var(--margin);
+  font-weight: 600;
+}
+
+.edit summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--pen);
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit form {
+  margin-top: 8px;
+}
+
+.footnote {
+  margin-top: 32px;
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+  max-width: 62ch;
+}
+
+/* ---------- Планшет и десктоп ---------- */
+
+@media (min-width: 820px) {
+  .sheet {
+    padding: 28px 32px 48px 64px;
+  }
+  .sheet::before {
+    left: 40px;
+  }
+  .masthead {
+    padding-bottom: 20px;
+  }
+  .masthead h1 {
+    font-size: 2.25rem;
+  }
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 48px;
+  }
+  .pay {
+    position: sticky;
+    top: 24px;
+    padding: 24px;
+  }
+  .dock {
+    display: none;
+  }
+  .toast {
+    bottom: 24px;
+  }
+  .sheet-dialog {
+    margin: auto;
+    border-radius: 18px;
+  }
+  .dialog__head,
+  .dialog__body {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

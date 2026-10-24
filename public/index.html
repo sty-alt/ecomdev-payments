@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Учёт оплат учебного центра: должники за месяц и внесение оплат">
+  <meta name="theme-color" content="#f6f8fc" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#131a2b" media="(prefers-color-scheme: dark)">
+  <title>Оплаты учебного центра</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="preload" href="/fonts/golos-text-cyrillic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/js/main.js"></script>
+</head>
+<body>
+  <div class="sheet">
+    <header class="masthead">
+      <h1>Оплаты</h1>
+      <nav class="month" aria-label="Выбор месяца">
+        <button type="button" class="round-button" id="month-prev" aria-label="Предыдущий месяц">‹</button>
+        <p class="month__label" id="month-label" aria-live="polite"></p>
+        <button type="button" class="round-button" id="month-next" aria-label="Следующий месяц">›</button>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <div class="main">
+        <div class="tabs" role="tablist" aria-label="Разделы">
+          <button type="button" class="tab" role="tab" id="tab-debtors" aria-controls="panel-debtors" aria-selected="true">
+            Должники<span class="tab__count" id="tab-debtors-count"></span>
+          </button>
+          <button type="button" class="tab" role="tab" id="tab-students" aria-controls="panel-students" aria-selected="false" tabindex="-1">
+            Ученики
+          </button>
+        </div>
+
+        <section id="panel-debtors" role="tabpanel" aria-labelledby="tab-debtors">
+          <div class="summary" id="summary" hidden>
+            <p class="summary__collected" id="summary-collected"></p>
+            <progress class="summary__bar" id="summary-bar" max="100" value="0" aria-label="Собрано от плана"></progress>
+            <p class="summary__details" id="summary-details"></p>
+          </div>
+          <fieldset class="filter-set" id="group-filters" hidden>
+            <legend class="visually-hidden">Показать должников группы</legend>
+            <div class="filters" id="group-filter-list"></div>
+          </fieldset>
+          <ol class="rows" id="debtor-list" aria-busy="true">
+            <li class="loading">Загружаем должников…</li>
+          </ol>
+        </section>
+
+        <section id="panel-students" role="tabpanel" aria-labelledby="tab-students" hidden>
+          <div class="toolbar">
+            <label class="visually-hidden" for="student-search">Поиск по имени, телефону или группе</label>
+            <input class="search" id="student-search" type="search" placeholder="Имя, телефон или группа" autocomplete="off">
+            <button type="button" class="pill-button" id="student-add">Добавить</button>
+          </div>
+          <p class="toolbar__note" id="students-note"></p>
+          <div id="student-list"></div>
+        </section>
+      </div>
+
+      <aside class="pay" id="pay" aria-labelledby="pay-title">
+        <h2 id="pay-title">Внести оплату</h2>
+        <form id="pay-form" novalidate>
+          <div class="field">
+            <label for="pay-student">Ученик</label>
+            <select id="pay-student" name="studentId" required aria-describedby="pay-student-hint">
+              <option value="">Выберите ученика</option>
+            </select>
+            <p class="field__hint" id="pay-student-hint" aria-live="polite"></p>
+            <p class="field__error" data-error-for="studentId"></p>
+          </div>
+          <div class="field">
+            <label for="pay-amount">Сумма, ₽</label>
+            <div class="amount">
+              <input id="pay-amount" name="amount" inputmode="decimal" autocomplete="off" placeholder="0" required>
+              <button type="button" class="chip" id="pay-fill-debt" hidden></button>
+            </div>
+            <p class="field__error" data-error-for="amount"></p>
+          </div>
+          <div class="field">
+            <label for="pay-date">Дата оплаты</label>
+            <input id="pay-date" name="date" type="date" required>
+            <p class="field__error" data-error-for="date"></p>
+          </div>
+          <button type="submit" class="button" id="pay-submit">Внести оплату</button>
+          <p class="field__error" id="pay-error" role="alert"></p>
+        </form>
+      </aside>
+    </main>
+
+    <footer class="footnote">
+      Должник — тот, кто за месяц заплатил меньше своей месячной суммы. Оплата засчитывается в месяц,
+      на который приходится её дата. <a href="/docs">Документация API</a>
+    </footer>
+  </div>
+
+  <div class="dock" id="dock">
+    <a class="button" href="#pay" id="dock-pay">Внести оплату</a>
+  </div>
+
+  <dialog class="sheet-dialog" id="student-dialog" aria-labelledby="dialog-title">
+    <header class="dialog__head">
+      <div>
+        <h2 id="dialog-title">Ученик</h2>
+        <p id="dialog-subtitle"></p>
+        <a class="dialog__phone" id="dialog-phone" href="tel:">Позвонить ученику</a>
+      </div>
+      <button type="button" class="round-button" id="dialog-close" aria-label="Закрыть">×</button>
+    </header>
+    <div class="dialog__body">
+      <section class="dialog__section" id="dialog-overview">
+        <h3>Оплаты по месяцам</h3>
+        <div class="journal" id="dialog-journal"></div>
+        <p class="journal__legend">✓ — оплачено полностью, красным — сколько не доплачено, «—» — ещё не занимался. Считается по текущей месячной сумме.</p>
+      </section>
+
+      <section class="dialog__section" id="dialog-actions">
+        <div class="dialog__actions">
+          <button type="button" class="button button--small" id="dialog-pay">Внести оплату</button>
+          <a class="button button--quiet button--small" id="dialog-call" href="tel:">Позвонить</a>
+        </div>
+      </section>
+
+      <section class="dialog__section" id="dialog-history-section">
+        <h3>История оплат</h3>
+        <ul class="history" id="dialog-history"></ul>
+      </section>
+
+      <section class="dialog__section">
+        <details class="edit" id="dialog-edit">
+          <summary>Изменить данные</summary>
+          <form id="student-form" novalidate>
+            <div class="field">
+              <label for="st-name">Имя</label>
+              <input id="st-name" name="name" autocomplete="off" required maxlength="200">
+              <p class="field__error" data-error-for="name"></p>
+            </div>
+            <div class="field">
+              <label for="st-phone">Телефон</label>
+              <input id="st-phone" name="phone" type="tel" inputmode="tel" autocomplete="off" placeholder="+7 999 123-45-67" required>
+              <p class="field__error" data-error-for="phone"></p>
+            </div>
+            <div class="field">
+              <label for="st-group">Группа</label>
+              <input id="st-group" name="group" list="group-options" autocomplete="off" required maxlength="100">
+              <datalist id="group-options"></datalist>
+              <p class="field__error" data-error-for="group"></p>
+            </div>
+            <div class="field-row">
+              <div class="field">
+                <label for="st-fee">В месяц, ₽</label>
+                <input id="st-fee" name="monthlyFee" inputmode="decimal" autocomplete="off" required>
+                <p class="field__error" data-error-for="monthlyFee"></p>
+              </div>
+              <div class="field">
+                <label for="st-start">Занимается с</label>
+                <input id="st-start" name="startDate" type="date" required>
+                <p class="field__error" data-error-for="startDate"></p>
+              </div>
+            </div>
+            <button type="submit" class="button" id="student-submit">Сохранить</button>
+            <p class="field__error" id="student-error" role="alert"></p>
+          </form>
+        </details>
+      </section>
+
+      <section class="dialog__section" id="dialog-danger">
+        <button type="button" class="button button--danger button--small" id="dialog-delete">Удалить ученика</button>
+      </section>
+    </div>
+  </dialog>
+
+  <div id="toast-region" aria-live="polite"></div>
+</body>
+</html>

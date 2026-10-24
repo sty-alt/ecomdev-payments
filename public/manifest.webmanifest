@@ -1,0 +1,11 @@
+{
+  "name": "Оплаты учебного центра",
+  "short_name": "Оплаты",
+  "description": "Должники за месяц и внесение оплат",
+  "lang": "ru",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#f6f8fc",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
